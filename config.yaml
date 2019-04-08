@@ -1,2 +1,3 @@
-route: "4.2.2.4"
-hits: 50
+route: "http://www.google.com"
+hits: 10
+code: 200

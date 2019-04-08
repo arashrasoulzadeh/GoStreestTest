@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/schollz/progressbar"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
@@ -13,6 +15,7 @@ import (
 type conf struct {
 	Hits  int    `yaml:"hits"`
 	Route string `yaml:"route"`
+	Code  int    `yaml:"code"`
 }
 
 func (c *conf) getConf() *conf {
@@ -28,16 +31,43 @@ func (c *conf) getConf() *conf {
 
 	return c
 }
-func MakeRequest(url string, ch chan<- string, id int, wg sync.WaitGroup ,bar *progressbar.ProgressBar) {
- 	start := time.Now()
-	_, _ = http.Get(url)
+
+func MakeRequest(url string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar) {
+	start := time.Now()
+	resp, err := http.Get(url)
 	_ = time.Since(start).Seconds()
- 	bar.Add(1)
- 	defer wg.Done()
+	writeToLog(id, resp, err)
+	bar.Add(1)
+	defer wg.Done()
 }
 
+func writeToLog(id int, response *http.Response, e error) {
+
+	f, err := os.OpenFile("log", os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		panic(err)
+	}
+
+	defer f.Close()
+
+	if _, err = f.WriteString(fmt.Sprintf("%d,%d\n", id, response.StatusCode)); err != nil {
+		panic(err)
+	}
+
+}
+
+func clearLog(){
+	message := []byte("id,code\n")
+	err := ioutil.WriteFile("log", message, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+
+}
 func main() {
 	var c conf
+	clearLog()
 	c.getConf()
 	_ = time.Now()
 	ch := make(chan string)
@@ -47,7 +77,7 @@ func main() {
 	bar.RenderBlank()
 
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(c.Route, ch, i, wg,bar)
+		go MakeRequest(c.Route, ch, i, wg, bar)
 	}
- 	wg.Wait()
+	wg.Wait()
 }
