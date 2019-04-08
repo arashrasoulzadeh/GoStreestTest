@@ -35,13 +35,18 @@ func (c *conf) getConf() *conf {
 func MakeRequest(url string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar) {
 	start := time.Now()
 	resp, err := http.Get(url)
-	_ = time.Since(start).Seconds()
-	writeToLog(id, resp, err)
+	duration := time.Since(start).Seconds()
+	if err != nil {
+		// handle the error, often:
+		bar.Add(1)
+		return
+	}
+	writeToLog(id, resp, err,duration)
 	bar.Add(1)
 	defer wg.Done()
 }
 
-func writeToLog(id int, response *http.Response, e error) {
+func writeToLog(id int, response *http.Response, e error,duration float64) {
 
 	f, err := os.OpenFile("log", os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
@@ -50,14 +55,14 @@ func writeToLog(id int, response *http.Response, e error) {
 
 	defer f.Close()
 
-	if _, err = f.WriteString(fmt.Sprintf("%d,%d\n", id, response.StatusCode)); err != nil {
+	if _, err = f.WriteString(fmt.Sprintf("%d,%d,%f\n", id, response.StatusCode,duration)); err != nil {
 		panic(err)
 	}
 
 }
 
 func clearLog(){
-	message := []byte("id,code\n")
+	message := []byte("id,code,duration\n")
 	err := ioutil.WriteFile("log", message, 0644)
 	if err != nil {
 		log.Fatal(err)
