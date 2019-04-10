@@ -1,3 +1,4 @@
 route: "http://www.xaas.ir"
 hits: 200
 code: 200
+method: post
