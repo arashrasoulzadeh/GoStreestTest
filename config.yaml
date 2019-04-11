@@ -2,4 +2,4 @@ route: "http://127.0.0.1:8000/"
 hits: 1
 code: 200
 method: post
-# body: {"limit": 10}
+body: {"limit": 10}
