@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,10 +17,11 @@ import (
 )
 
 type conf struct {
-	Hits   int    `yaml:"hits"`
-	Route  string `yaml:"route"`
-	Code   int    `yaml:"code"`
-	Method string `yaml:"method"`
+	Hits   int                    `yaml:"hits"`
+	Route  string                 `yaml:"route"`
+	Code   int                    `yaml:"code"`
+	Method string                 `yaml:"method"`
+	Body   map[string]interface{} `yaml:"body"`
 }
 
 func (c *conf) getConf() *conf {
@@ -35,7 +37,7 @@ func (c *conf) getConf() *conf {
 	return c
 }
 
-func SendHttpRequest(method string, url string) (*http.Response, error) {
+func SendHttpRequest(method string, url string, body string) (*http.Response, error) {
 	method = strings.ToUpper(method)
 
 	switch method {
@@ -56,7 +58,9 @@ func SendHttpRequest(method string, url string) (*http.Response, error) {
 	case http.MethodPut:
 		fallthrough
 	case http.MethodTrace:
-		req, err := http.NewRequest(method, url, new(bytes.Buffer))
+		reqBody := []byte(body)
+		req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
+		req.Header.Set("Content-Type", "application/json")
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		return resp, err
@@ -67,10 +71,10 @@ func SendHttpRequest(method string, url string) (*http.Response, error) {
 	return resp, err
 }
 
-func MakeRequest(url string, method string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar) {
+func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar) {
 	start := time.Now()
 
-	resp, err := SendHttpRequest(method, url)
+	resp, err := SendHttpRequest(method, url, body)
 
 	duration := time.Since(start).Seconds()
 	if err != nil {
@@ -115,8 +119,20 @@ func main() {
 	bar := progressbar.New(c.Hits)
 	bar.RenderBlank()
 
+	var body string
+	if c.Body != nil {
+		marshalled, err := json.Marshal(c.Body)
+		if err != nil {
+			panic(err)
+		}
+		body = string(marshalled)
+	} else {
+		marshalled, _ := json.Marshal(map[string]interface{}{})
+		body = string(marshalled)
+	}
+
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(c.Route, c.Method, ch, i, wg, bar)
+		go MakeRequest(c.Route, c.Method, body, ch, i, wg, bar)
 	}
 	wg.Wait()
 }
