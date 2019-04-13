@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/schollz/progressbar"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/schollz/progressbar"
-	"gopkg.in/yaml.v2"
 )
 
 //strucure of the yaml file
@@ -24,6 +24,7 @@ type conf struct {
 	Method string                 `yaml:"method"`
 	Body   map[string]interface{} `yaml:"body"`
 }
+
 //get the configuration
 func (c *conf) getConf() *conf {
 	yamlFile, err := ioutil.ReadFile("config.yaml")
@@ -37,8 +38,9 @@ func (c *conf) getConf() *conf {
 
 	return c
 }
+
 //send http call
-func SendHttpRequest(method string, url string, body string,wg *sync.WaitGroup) (*http.Response, error) {
+func SendHttpRequest(method string, url string, body string, wg *sync.WaitGroup) (*http.Response, error) {
 	method = strings.ToUpper(method)
 	switch method {
 	case http.MethodGet:
@@ -70,47 +72,53 @@ func SendHttpRequest(method string, url string, body string,wg *sync.WaitGroup) 
 	resp, err := http.Get(url)
 	return resp, err
 }
+
 //recover if error occured in MakeRequest
-func MakeRequestRecovery(wg *sync.WaitGroup){
+func MakeRequestRecovery(wg *sync.WaitGroup) {
 	defer wg.Done()
 	if r := recover(); r != nil {
 		fmt.Println("Recovered in f", r)
 	}
 }
+
 //make request handler
-func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar,f *os.File,ferr error) {
+func MakeRequest(thread int, url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error) {
 	defer MakeRequestRecovery(wg)
 	start := time.Now()
-	resp, err := SendHttpRequest(method, url, body,wg)
+	resp, err := SendHttpRequest(method, url, body, wg)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
-		writeToLog(id, resp, err, duration,f,ferr)
+		writeToLog(thread, id, resp, err, duration, f, ferr)
 		bar.Add(1)
 		return
 	}
-	writeToLog(id, resp, err, duration,f,ferr)
+	writeToLog(thread, id, resp, err, duration, f, ferr)
 	bar.Add(1)
 }
+
 //write to the log
-func writeToLog(id int, response *http.Response, e error, duration float64,f *os.File,ferr error) {
+func writeToLog(thread int, id int, response *http.Response, e error, duration float64, f *os.File, ferr error) {
 	if e != nil {
-	}else{
-		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%f,%s\n", id, response.StatusCode, duration, "0")); ferr != nil {
+	} else {
+		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%d,%f,%s\n", thread, id, response.StatusCode, duration, "0")); ferr != nil {
 			panic(ferr)
 		}
 	}
 }
+
 //clear log for use
 func clearLog() {
-	message := []byte("id,code,duration,error\n")
+	message := []byte("thread,id,code,duration,error\n")
 	err := ioutil.WriteFile("log.csv", message, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
-//main function
-func main() {
+
+//worker
+func worker(mainWaitGroup *sync.WaitGroup, thread int) {
+	defer mainWaitGroup.Done()
 	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		panic(err)
@@ -120,7 +128,6 @@ func main() {
 	}()
 	var wg sync.WaitGroup
 	var c conf
-	clearLog()
 	c.getConf()
 	_ = time.Now()
 	ch := make(chan string)
@@ -139,7 +146,64 @@ func main() {
 		body = string(marshaled)
 	}
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(c.Route, c.Method, body, ch, i, &wg, bar,f,err)
+		go MakeRequest(thread, c.Route, c.Method, body, ch, i, &wg, bar, f, err)
 	}
 	wg.Wait()
+}
+
+func single() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	worker(&wg, 1)
+}
+func multiple() {
+	input := os.Args
+	if len(input) == 3 {
+		counts := input[2]
+		count, err := strconv.Atoi(counts)
+		if err != nil {
+			help()
+			return
+		}
+		var wg sync.WaitGroup
+		wg.Add(count)
+		for i := 1; i <= count; i++ {
+			go worker(&wg, i)
+		}
+		wg.Wait()
+	} else {
+		help()
+	}
+}
+
+func commandRouter(s string, ) {
+	if s == "single" {
+		single()
+	} else if s == "multiple" {
+		multiple()
+	} else {
+		help()
+	}
+}
+
+//show cli help
+func help() {
+	fmt.Println("    GOLANG Stress Test :: Arash Rasoulzadeh ")
+	fmt.Println("------------------------------------------------")
+	fmt.Println(" single            ::  run a single application")
+	fmt.Println(" multiple {counts} ::  run with {counts} threads")
+	fmt.Println("------------------------------------------------")
+}
+
+//main function
+func main() {
+	//worker()
+	input := os.Args
+	if len(input) >= 2 {
+		clearLog()
+		command := input[1]
+		commandRouter(command)
+	} else {
+		help()
+	}
 }
