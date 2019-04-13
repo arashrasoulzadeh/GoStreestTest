@@ -74,8 +74,9 @@ func SendHttpRequest(method string, url string, body string, wg *sync.WaitGroup)
 }
 
 //recover if error occured in MakeRequest
-func MakeRequestRecovery(wg *sync.WaitGroup) {
+func MakeRequestRecovery(wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 	defer wg.Done()
+	bar.Add(1)
 	if r := recover(); r != nil {
 		fmt.Println("Recovered in f", r)
 	}
@@ -83,18 +84,16 @@ func MakeRequestRecovery(wg *sync.WaitGroup) {
 
 //make request handler
 func MakeRequest(thread int, url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error) {
-	defer MakeRequestRecovery(wg)
+	defer MakeRequestRecovery(wg, bar)
 	start := time.Now()
 	resp, err := SendHttpRequest(method, url, body, wg)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
 		writeToLog(thread, id, resp, err, duration, f, ferr)
-		bar.Add(1)
 		return
 	}
 	writeToLog(thread, id, resp, err, duration, f, ferr)
-	bar.Add(1)
 }
 
 //write to the log
@@ -117,14 +116,14 @@ func clearLog() {
 }
 
 //worker
-func worker(mainWaitGroup *sync.WaitGroup, thread int) {
-	defer mainWaitGroup.Done()
+func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressbar.ProgressBar) {
 	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
 		f.Close()
+		defer mainWaitGroup.Done()
 	}()
 	var wg sync.WaitGroup
 	var c conf
@@ -132,8 +131,6 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int) {
 	_ = time.Now()
 	ch := make(chan string)
 	wg.Add(c.Hits)
-	bar := progressbar.New(c.Hits)
-	bar.RenderBlank()
 	var body string
 	if c.Body != nil {
 		marshaled, err := json.Marshal(c.Body)
@@ -152,11 +149,16 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int) {
 }
 
 func single() {
+	var c conf
+	c.getConf()
+	bar := *progressbar.New(c.Hits * 1)
+	bar.RenderBlank()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	worker(&wg, 1)
+	worker(&wg, 1, 1, &bar)
 }
 func multiple() {
+
 	input := os.Args
 	if len(input) == 3 {
 		counts := input[2]
@@ -165,10 +167,14 @@ func multiple() {
 			help()
 			return
 		}
+		var c conf
+		c.getConf()
+		bar := *progressbar.New(c.Hits * count)
+		bar.RenderBlank()
 		var wg sync.WaitGroup
 		wg.Add(count)
 		for i := 1; i <= count; i++ {
-			go worker(&wg, i)
+			go worker(&wg, i, count, &bar)
 		}
 		wg.Wait()
 	} else {
