@@ -1,5 +1,5 @@
-route: "http://www.dunro.ir"
-hits: 200
+route: "http://localhost:8000"
+hits: 50
 code: 200
-method: post
+method: get
 body: {"limit": 10}

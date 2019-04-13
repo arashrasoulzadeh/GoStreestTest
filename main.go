@@ -38,9 +38,8 @@ func (c *conf) getConf() *conf {
 	return c
 }
 //send http call
-func SendHttpRequest(method string, url string, body string) (*http.Response, error) {
+func SendHttpRequest(method string, url string, body string,wg *sync.WaitGroup) (*http.Response, error) {
 	method = strings.ToUpper(method)
-
 	switch method {
 	case http.MethodGet:
 		fallthrough
@@ -72,17 +71,17 @@ func SendHttpRequest(method string, url string, body string) (*http.Response, er
 	return resp, err
 }
 //recover if error occured in MakeRequest
-func MakeRequestRecovery(wg sync.WaitGroup){
+func MakeRequestRecovery(wg *sync.WaitGroup){
 	defer wg.Done()
 	if r := recover(); r != nil {
 		fmt.Println("Recovered in f", r)
 	}
 }
 //make request handler
-func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar,f *os.File,ferr error) {
+func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar,f *os.File,ferr error) {
 	defer MakeRequestRecovery(wg)
 	start := time.Now()
-	resp, err := SendHttpRequest(method, url, body)
+	resp, err := SendHttpRequest(method, url, body,wg)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
@@ -95,15 +94,7 @@ func MakeRequest(url string, method string, body string, ch chan<- string, id in
 }
 //write to the log
 func writeToLog(id int, response *http.Response, e error, duration float64,f *os.File,ferr error) {
-
-
 	if e != nil {
-		fmt.Println(id)
-		fmt.Println(response.StatusCode)
-		fmt.Println(duration)
-		fmt.Println("1")
-		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%f,%s\n", id, response.StatusCode, duration, "1")); ferr != nil {
-		}
 	}else{
 		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%f,%s\n", id, response.StatusCode, duration, "0")); ferr != nil {
 			panic(ferr)
@@ -124,31 +115,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
+	defer func() {
+		f.Close()
+	}()
+	var wg sync.WaitGroup
 	var c conf
 	clearLog()
 	c.getConf()
 	_ = time.Now()
 	ch := make(chan string)
-	var wg sync.WaitGroup
 	wg.Add(c.Hits)
 	bar := progressbar.New(c.Hits)
 	bar.RenderBlank()
-
 	var body string
 	if c.Body != nil {
-		marshalled, err := json.Marshal(c.Body)
+		marshaled, err := json.Marshal(c.Body)
 		if err != nil {
 			panic(err)
 		}
-		body = string(marshalled)
+		body = string(marshaled)
 	} else {
-		marshalled, _ := json.Marshal(map[string]interface{}{})
-		body = string(marshalled)
+		marshaled, _ := json.Marshal(map[string]interface{}{})
+		body = string(marshaled)
 	}
-
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(c.Route, c.Method, body, ch, i, wg, bar,f,err)
+		go MakeRequest(c.Route, c.Method, body, ch, i, &wg, bar,f,err)
 	}
 	wg.Wait()
 }
