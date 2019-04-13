@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//strucure of the yaml file
 type conf struct {
 	Hits   int                    `yaml:"hits"`
 	Route  string                 `yaml:"route"`
@@ -23,7 +24,7 @@ type conf struct {
 	Method string                 `yaml:"method"`
 	Body   map[string]interface{} `yaml:"body"`
 }
-
+//get the configuration
 func (c *conf) getConf() *conf {
 	yamlFile, err := ioutil.ReadFile("config.yaml")
 	if err != nil {
@@ -36,7 +37,7 @@ func (c *conf) getConf() *conf {
 
 	return c
 }
-
+//send http call
 func SendHttpRequest(method string, url string, body string) (*http.Response, error) {
 	method = strings.ToUpper(method)
 
@@ -70,45 +71,60 @@ func SendHttpRequest(method string, url string, body string) (*http.Response, er
 	resp, err := http.Get(url)
 	return resp, err
 }
-
-func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar) {
+//recover if error occured in MakeRequest
+func MakeRequestRecovery(wg sync.WaitGroup){
+	defer wg.Done()
+	if r := recover(); r != nil {
+		fmt.Println("Recovered in f", r)
+	}
+}
+//make request handler
+func MakeRequest(url string, method string, body string, ch chan<- string, id int, wg sync.WaitGroup, bar *progressbar.ProgressBar,f *os.File,ferr error) {
+	defer MakeRequestRecovery(wg)
 	start := time.Now()
-
 	resp, err := SendHttpRequest(method, url, body)
-
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
+		writeToLog(id, resp, err, duration,f,ferr)
 		bar.Add(1)
 		return
 	}
-	writeToLog(id, resp, err, duration)
+	writeToLog(id, resp, err, duration,f,ferr)
 	bar.Add(1)
-	defer wg.Done()
 }
+//write to the log
+func writeToLog(id int, response *http.Response, e error, duration float64,f *os.File,ferr error) {
 
-func writeToLog(id int, response *http.Response, e error, duration float64) {
-	f, err := os.OpenFile("log", os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		panic(err)
-	}
 
-	defer f.Close()
-
-	if _, err = f.WriteString(fmt.Sprintf("%d,%d,%f\n", id, response.StatusCode, duration)); err != nil {
-		panic(err)
+	if e != nil {
+		fmt.Println(id)
+		fmt.Println(response.StatusCode)
+		fmt.Println(duration)
+		fmt.Println("1")
+		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%f,%s\n", id, response.StatusCode, duration, "1")); ferr != nil {
+		}
+	}else{
+		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%f,%s\n", id, response.StatusCode, duration, "0")); ferr != nil {
+			panic(ferr)
+		}
 	}
 }
-
+//clear log for use
 func clearLog() {
-	message := []byte("id,code,duration\n")
-	err := ioutil.WriteFile("log", message, 0644)
+	message := []byte("id,code,duration,error\n")
+	err := ioutil.WriteFile("log.csv", message, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
-
+//main function
 func main() {
+	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
 	var c conf
 	clearLog()
 	c.getConf()
@@ -132,7 +148,7 @@ func main() {
 	}
 
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(c.Route, c.Method, body, ch, i, wg, bar)
+		go MakeRequest(c.Route, c.Method, body, ch, i, wg, bar,f,err)
 	}
 	wg.Wait()
 }
