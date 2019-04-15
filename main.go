@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/schollz/progressbar"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -14,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/schollz/progressbar"
+	"gopkg.in/yaml.v2"
 )
 
 //strucure of the yaml file
@@ -25,9 +26,12 @@ type conf struct {
 	Body   map[string]interface{} `yaml:"body"`
 }
 
+const defaultPathToConfigFile = "config.yaml"
+
 //get the configuration
-func (c *conf) getConf() *conf {
-	yamlFile, err := ioutil.ReadFile("config.yaml")
+// dest: file destination / the path to config file
+func (c *conf) getConf(dest string) *conf {
+	yamlFile, err := ioutil.ReadFile(dest)
 	if err != nil {
 		log.Printf("yamlFile.Get err   #%v ", err)
 	}
@@ -40,7 +44,7 @@ func (c *conf) getConf() *conf {
 }
 
 //send http call
-func SendHttpRequest(method string, url string, body string, wg *sync.WaitGroup) (*http.Response, error) {
+func SendHttpRequest(method string, url string, body string) (*http.Response, error) {
 	method = strings.ToUpper(method)
 	switch method {
 	case http.MethodGet:
@@ -86,7 +90,7 @@ func MakeRequestRecovery(wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 func MakeRequest(thread int, url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error) {
 	defer MakeRequestRecovery(wg, bar)
 	start := time.Now()
-	resp, err := SendHttpRequest(method, url, body, wg)
+	resp, err := SendHttpRequest(method, url, body)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
@@ -127,7 +131,7 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressb
 	}()
 	var wg sync.WaitGroup
 	var c conf
-	c.getConf()
+	c.getConf(defaultPathToConfigFile)
 	_ = time.Now()
 	ch := make(chan string)
 	wg.Add(c.Hits)
@@ -150,13 +154,14 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressb
 
 func single() {
 	var c conf
-	c.getConf()
+	c.getConf(defaultPathToConfigFile)
 	bar := *progressbar.New(c.Hits * 1)
 	bar.RenderBlank()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	worker(&wg, 1, 1, &bar)
 }
+
 func multiple() {
 
 	input := os.Args
@@ -168,7 +173,7 @@ func multiple() {
 			return
 		}
 		var c conf
-		c.getConf()
+		c.getConf(defaultPathToConfigFile)
 		bar := *progressbar.New(c.Hits * count)
 		bar.RenderBlank()
 		var wg sync.WaitGroup
@@ -182,7 +187,7 @@ func multiple() {
 	}
 }
 
-func commandRouter(s string, ) {
+func commandRouter(s string) {
 	if s == "single" {
 		single()
 	} else if s == "multiple" {
