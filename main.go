@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,31 +85,42 @@ func MakeRequestRecovery(wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 	bar.Add(1)
 	if r := recover(); r != nil {
 		fmt.Println("Recovered in f", r)
+		fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
 	}
 }
 
 //make request handler
-func MakeRequest(thread int, url string, method string, body string, ch chan<- string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error) {
+func MakeRequest(thread int, url string, method string, body string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error, values *list.List) {
 	defer MakeRequestRecovery(wg, bar)
 	start := time.Now()
 	resp, err := SendHttpRequest(method, url, body)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
-		writeToLog(thread, id, resp, err, duration, f, ferr)
+		msg := fmt.Sprintf("%d,%d,%d,%f,%s\n",
+			thread,
+			id,
+			-1,
+			duration, "-1");
+		values.PushFront(msg)
+		//writeToArray(thread, id, resp, err, duration, f, ferr,values)
 		return
 	}
-	writeToLog(thread, id, resp, err, duration, f, ferr)
+	msg := fmt.Sprintf("%d,%d,%d,%f,%s\n",
+		thread,
+		id,
+		resp.StatusCode,
+		duration, "-1");
+	values.PushFront(msg)
 }
 
 //write to the log
-func writeToLog(thread int, id int, response *http.Response, e error, duration float64, f *os.File, ferr error) {
-	if e != nil {
-	} else {
-		if _, ferr = f.WriteString(fmt.Sprintf("%d,%d,%d,%f,%s\n", thread, id, response.StatusCode, duration, "0")); ferr != nil {
-			panic(ferr)
-		}
+func writeToLog(values *list.List, f *os.File) {
+	//fmt.Println(values.Len())
+	for temp := values.Front(); temp != nil; temp = temp.Next() {
+ 		f.WriteString(fmt.Sprint(temp.Value));
 	}
+
 }
 
 //clear log for use
@@ -120,20 +133,15 @@ func clearLog() {
 }
 
 //worker
-func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressbar.ProgressBar) {
-	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		panic(err)
-	}
+func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressbar.ProgressBar, values *list.List, f *os.File, ferr error) {
+
 	defer func() {
-		f.Close()
-		defer mainWaitGroup.Done()
+ 		defer mainWaitGroup.Done()
 	}()
 	var wg sync.WaitGroup
 	var c conf
 	c.getConf(defaultPathToConfigFile)
 	_ = time.Now()
-	ch := make(chan string)
 	wg.Add(c.Hits)
 	var body string
 	if c.Body != nil {
@@ -147,25 +155,43 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressb
 		body = string(marshaled)
 	}
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(thread, c.Route, c.Method, body, ch, i, &wg, bar, f, err)
+		go MakeRequest(thread, c.Route, c.Method, body, i, &wg, bar, f, ferr, values)
 	}
 	wg.Wait()
 }
 
-func single() {
+
+
+func single(values *list.List) {
+	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		f.Close()
+	}()
 	var c conf
 	c.getConf(defaultPathToConfigFile)
 	bar := *progressbar.New(c.Hits * 1)
 	bar.RenderBlank()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	worker(&wg, 1, 1, &bar)
+	worker(&wg, 1, 1, &bar, values,f,err)
+	writeToLog(values,f)
+
 }
 
-func multiple() {
+func multiple(values *list.List) {
 
 	input := os.Args
 	if len(input) == 3 {
+		f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			f.Close()
+		}()
 		counts := input[2]
 		count, err := strconv.Atoi(counts)
 		if err != nil {
@@ -179,19 +205,21 @@ func multiple() {
 		var wg sync.WaitGroup
 		wg.Add(count)
 		for i := 1; i <= count; i++ {
-			go worker(&wg, i, count, &bar)
+			go worker(&wg, i, count, &bar, values,f,err)
 		}
 		wg.Wait()
+		writeToLog(values,f)
 	} else {
+
 		help()
 	}
 }
 
-func commandRouter(s string) {
+func commandRouter(s string, values *list.List) {
 	if s == "single" {
-		single()
+		single(values)
 	} else if s == "multiple" {
-		multiple()
+		multiple(values)
 	} else {
 		help()
 	}
@@ -209,11 +237,12 @@ func help() {
 //main function
 func main() {
 	//worker()
+	values := list.New()
 	input := os.Args
 	if len(input) >= 2 {
 		clearLog()
 		command := input[1]
-		commandRouter(command)
+		commandRouter(command, values)
 	} else {
 		help()
 	}

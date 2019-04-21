@@ -1,5 +1,5 @@
 route: "http://localhost:8000"
-hits: 50
+hits: 40
 code: 200
 method: get
 body: {"limit": 10}
