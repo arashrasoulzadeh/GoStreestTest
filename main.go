@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,32 +84,41 @@ func MakeRequestRecovery(wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 	bar.Add(1)
 	if r := recover(); r != nil {
 		fmt.Println("Recovered in f", r)
-		fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
 	}
+}
+
+func getError(err string) string {
+	if strings.Contains(err, "refused") {
+		return "REFUSED"
+	}
+	if strings.Contains(err, "reset") {
+		return "RESET"
+	}
+	return "UNKNOWN"
 }
 
 //make request handler
 func MakeRequest(thread int, url string, method string, body string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error, values *list.List) {
 	defer MakeRequestRecovery(wg, bar)
+	fmt.Println(fmt.Sprintf("runner #%d is running ",thread))
 	start := time.Now()
 	resp, err := SendHttpRequest(method, url, body)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
-		msg := fmt.Sprintf("%d,%d,%d,%f,%s\n",
+ 		msg := fmt.Sprintf("%d,%d,%d,%f,%s,%s\n",
 			thread,
 			id,
 			-1,
-			duration, "-1");
+			duration, "-1",fmt.Sprint(getError(err.Error())))
 		values.PushFront(msg)
-		//writeToArray(thread, id, resp, err, duration, f, ferr,values)
 		return
 	}
-	msg := fmt.Sprintf("%d,%d,%d,%f,%s\n",
+	msg := fmt.Sprintf("%d,%d,%d,%f,%s,%s\n",
 		thread,
 		id,
 		resp.StatusCode,
-		duration, "-1");
+		duration, "0","NA")
 	values.PushFront(msg)
 }
 
@@ -118,14 +126,14 @@ func MakeRequest(thread int, url string, method string, body string, id int, wg 
 func writeToLog(values *list.List, f *os.File) {
 	//fmt.Println(values.Len())
 	for temp := values.Front(); temp != nil; temp = temp.Next() {
- 		f.WriteString(fmt.Sprint(temp.Value));
+ 		f.WriteString(fmt.Sprint(temp.Value))
 	}
 
 }
 
 //clear log for use
 func clearLog() {
-	message := []byte("thread,id,code,duration,error\n")
+	message := []byte("thread,id,code,duration,error,error_desc\n")
 	err := ioutil.WriteFile("log.csv", message, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -134,9 +142,8 @@ func clearLog() {
 
 //worker
 func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressbar.ProgressBar, values *list.List, f *os.File, ferr error) {
-
 	defer func() {
- 		defer mainWaitGroup.Done()
+		defer mainWaitGroup.Done()
 	}()
 	var wg sync.WaitGroup
 	var c conf
