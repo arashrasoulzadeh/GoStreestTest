@@ -2,19 +2,20 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"os/exec"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
 )
 
 type scenarioConf struct {
 	Label      string `yaml:"label"`
 	ConfigFile string `yaml:"config"`
-	Sleep      string    `yaml:"sleep"`
+	Sleep      string `yaml:"sleep"`
 }
 
 //strucure of the yaml file
@@ -23,6 +24,9 @@ type scenario struct {
 }
 
 const defaultPathToScenarioFile = "scenario.yaml"
+const TYPE_ERROR = 0;
+const TYPE_SUCCESS = 1;
+const TYPE_INFO = 3;
 
 //get the scenario
 // dest: file destination / the path to scenario file
@@ -44,22 +48,35 @@ func run(ConfigFile string, wg *sync.WaitGroup) {
 		wg.Done()
 	}()
 	app := "go"
-	//app := "buah"
-
 	arg0 := "run"
 	arg1 := "main.go"
 	arg2 := "single"
+	arg3 := ConfigFile
 
-	cmd := exec.Command(app, arg0, arg1, arg2)
-	stdout, err := cmd.Output()
+	cmd := exec.Command(app, arg0, arg1, arg2, arg3)
+	_, err := cmd.Output()
 
 	if err != nil {
-		println(err.Error())
+		coloredPrint("COMPOSER:ERROR  ", err.Error(), TYPE_ERROR)
 		return
+	}else{
+		coloredPrint("COMPOSER:SUCCESS", ConfigFile, TYPE_SUCCESS)
 	}
 
-	print(string(stdout))
+	//print(string(stdout))
 
+}
+func coloredPrint(colored string, msg string, msgtype int ) {
+	label := color.New(color.FgGreen).SprintFunc()
+	if msgtype==TYPE_ERROR {
+		label = color.New(color.FgRed).SprintFunc()
+	}
+	if msgtype==TYPE_INFO {
+		label = color.New(color.FgBlue).SprintFunc()
+	}
+
+	message := color.New(color.FgBlack).SprintFunc()
+	fmt.Printf("%s :: %s\n", label(colored), message(msg))
 }
 func main() {
 	var wg sync.WaitGroup
@@ -68,11 +85,12 @@ func main() {
 	c.getScenario(defaultPathToScenarioFile)
 	for _, element := range c.Scenarios {
 		wg.Add(1);
-		fmt.Print("\n running config file\n")
+		coloredPrint("COMPOSER:RUN    ", element.ConfigFile, TYPE_INFO)
 		run(element.ConfigFile, &wg)
-		fmt.Print(fmt.Sprintf("\n now sleeping %s seconds ...\n", element.Sleep))
-		sleep,_ := strconv.Atoi(element.Sleep);
- 		time.Sleep(time.Duration(sleep) * time.Second)
+		coloredPrint("COMPOSER:SLEEP  ", element.Sleep, TYPE_INFO)
+
+		sleep, _ := strconv.Atoi(element.Sleep);
+		time.Sleep(time.Duration(sleep) * time.Second)
 	}
 	defer func() {
 		fmt.Println("halt.")
