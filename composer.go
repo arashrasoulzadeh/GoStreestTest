@@ -7,11 +7,14 @@ import (
 	"log"
 	"os/exec"
 	"sync"
+	"time"
+	"strconv"
 )
 
 type scenarioConf struct {
 	Label      string `yaml:"label"`
 	ConfigFile string `yaml:"config"`
+	Sleep      string    `yaml:"sleep"`
 }
 
 //strucure of the yaml file
@@ -36,7 +39,7 @@ func (c *scenario) getScenario(dest string) *scenario {
 	return c
 }
 
-func run(ConfigFile string,wg *sync.WaitGroup) {
+func run(ConfigFile string, wg *sync.WaitGroup) {
 	defer func() {
 		wg.Done()
 	}()
@@ -65,8 +68,11 @@ func main() {
 	c.getScenario(defaultPathToScenarioFile)
 	for _, element := range c.Scenarios {
 		wg.Add(1);
-		fmt.Println("\n\n running config file")
-		run(element.ConfigFile,&wg)
+		fmt.Print("\n running config file\n")
+		run(element.ConfigFile, &wg)
+		fmt.Print(fmt.Sprintf("\n now sleeping %s seconds ...\n", element.Sleep))
+		sleep,_ := strconv.Atoi(element.Sleep);
+ 		time.Sleep(time.Duration(sleep) * time.Second)
 	}
 	defer func() {
 		fmt.Println("halt.")

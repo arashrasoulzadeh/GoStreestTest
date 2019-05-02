@@ -1,7 +1,7 @@
 ## GO API Stress Test
 Use this appication to stress test your api
 
-Writeen by [Arash Rasoulzadeh]("http://twitter.com/x3n0b1a") , special thanks to [amiraliamhh](https://github.com/arashrasoulzadeh/GoStreestTest/commits?author=amiraliamhh) 
+Writeen by [Arash Rasoulzadeh]("http://twitter.com/x3n0b1a") , special thanks to [amiraliamhh](https://github.com/amiraliamhh) 
 
 ## Example usage
 

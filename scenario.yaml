@@ -2,6 +2,8 @@ scenarios:
   -
     label: "light"
     config: "config.yaml"
+    sleep: 5
   -
     label: "medium"
     config: "config.yaml"
+    sleep : 1
