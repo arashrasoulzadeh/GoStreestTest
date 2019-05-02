@@ -20,12 +20,15 @@ import (
 
 //strucure of the yaml file
 type conf struct {
-	Hits   int                    `yaml:"hits"`
-	Route  string                 `yaml:"route"`
-	Code   int                    `yaml:"code"`
-	Method string                 `yaml:"method"`
-	Body   map[string]interface{} `yaml:"body"`
+	Hits    int                    `yaml:"hits"`
+	Route   string                 `yaml:"route"`
+	Code    int                    `yaml:"code"`
+	Method  string                 `yaml:"method"`
+	Body    map[string]interface{} `yaml:"body"`
+	Headers map[string]string      `yaml:"headers"`
 }
+
+type headersType map[string]string
 
 const defaultPathToConfigFile = "config.yaml"
 
@@ -45,7 +48,7 @@ func (c *conf) getConf(dest string) *conf {
 }
 
 //send http call
-func SendHttpRequest(method string, url string, body string) (*http.Response, error) {
+func SendHttpRequest(method string, url string, body string, headers headersType) (*http.Response, error) {
 	method = strings.ToUpper(method)
 	switch method {
 	case http.MethodGet:
@@ -68,6 +71,13 @@ func SendHttpRequest(method string, url string, body string) (*http.Response, er
 		reqBody := []byte(body)
 		req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
 		req.Header.Set("Content-Type", "application/json")
+
+		if len(headers) != 0 {
+			for header := range headers {
+				req.Header.Set(header, headers[header])
+			}
+		}
+
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		return resp, err
@@ -98,18 +108,18 @@ func getError(err string) string {
 }
 
 //make request handler
-func MakeRequest(thread int, url string, method string, body string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error, values *list.List) {
+func MakeRequest(thread int, url string, method string, body string, headers headersType, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error, values *list.List) {
 	defer MakeRequestRecovery(wg, bar)
 	start := time.Now()
-	resp, err := SendHttpRequest(method, url, body)
+	resp, err := SendHttpRequest(method, url, body, headers)
 	duration := time.Since(start).Seconds()
 	if err != nil {
 		// handle the error, often:
- 		msg := fmt.Sprintf("%d,%d,%d,%f,%s,%s\n",
+		msg := fmt.Sprintf("%d,%d,%d,%f,%s,%s\n",
 			thread,
 			id,
 			-1,
-			duration, "-1",fmt.Sprint(getError(err.Error())))
+			duration, "-1", fmt.Sprint(getError(err.Error())))
 		values.PushFront(msg)
 		return
 	}
@@ -117,7 +127,7 @@ func MakeRequest(thread int, url string, method string, body string, id int, wg 
 		thread,
 		id,
 		resp.StatusCode,
-		duration, "0","NA")
+		duration, "0", "NA")
 	values.PushFront(msg)
 }
 
@@ -125,7 +135,7 @@ func MakeRequest(thread int, url string, method string, body string, id int, wg 
 func writeToLog(values *list.List, f *os.File) {
 	//fmt.Println(values.Len())
 	for temp := values.Front(); temp != nil; temp = temp.Next() {
- 		f.WriteString(fmt.Sprint(temp.Value))
+		f.WriteString(fmt.Sprint(temp.Value))
 	}
 
 }
@@ -160,13 +170,12 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressb
 		marshaled, _ := json.Marshal(map[string]interface{}{})
 		body = string(marshaled)
 	}
+
 	for i := 1; i <= c.Hits; i++ {
-		go MakeRequest(thread, c.Route, c.Method, body, i, &wg, bar, f, ferr, values)
+		go MakeRequest(thread, c.Route, c.Method, body, c.Headers, i, &wg, bar, f, ferr, values)
 	}
 	wg.Wait()
 }
-
-
 
 func single(values *list.List) {
 	f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
@@ -182,9 +191,8 @@ func single(values *list.List) {
 	bar.RenderBlank()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	worker(&wg, 1, 1, &bar, values,f,err)
-	writeToLog(values,f)
-
+	worker(&wg, 1, 1, &bar, values, f, err)
+	writeToLog(values, f)
 }
 
 func multiple(values *list.List) {
@@ -211,10 +219,10 @@ func multiple(values *list.List) {
 		var wg sync.WaitGroup
 		wg.Add(count)
 		for i := 1; i <= count; i++ {
-			go worker(&wg, i, count, &bar, values,f,err)
+			go worker(&wg, i, count, &bar, values, f, err)
 		}
 		wg.Wait()
-		writeToLog(values,f)
+		writeToLog(values, f)
 	} else {
 
 		help()
