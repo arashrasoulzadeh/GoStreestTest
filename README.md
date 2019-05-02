@@ -34,7 +34,9 @@ scenarios key is an array of
 * label - its just a label
 * config - is the config file name
 * sleep - sleep in seconds after running this part
-##### changelog
+#### changelog
+- readme fixed
+- colorized labels in scenario
 - scenario added
 - fixed bugs in multi-threading
 
