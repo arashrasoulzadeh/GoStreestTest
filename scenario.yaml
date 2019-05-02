@@ -1,0 +1,7 @@
+scenarios:
+  -
+    label: "light"
+    config: "config.yaml"
+  -
+    label: "medium"
+    config: "config.yaml"

@@ -1,7 +1,7 @@
 ## GO API Stress Test
-use this appication to stress test your api
+Use this appication to stress test your api
 
-writeen by Arash Rasoulzadeh
+Writeen by [Arash Rasoulzadeh]("http://twitter.com/x3n0b1a") , special thanks to [amiraliamhh](https://github.com/arashrasoulzadeh/GoStreestTest/commits?author=amiraliamhh) 
 
 ## Example usage
 
@@ -10,5 +10,11 @@ writeen by Arash Rasoulzadeh
 
 #### Run using multiple threads:
 *runs using 4 threads*
-
 `go run main.go multiple 4`
+#### Scenario 
+
+
+##### changelog
+- scenario added
+- fixed bugs in multi-threading
+
