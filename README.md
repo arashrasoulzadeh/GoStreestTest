@@ -17,17 +17,23 @@ Writeen by [Arash Rasoulzadeh]("http://twitter.com/x3n0b1a") , special thanks to
 This command runs the composer , composer reads the configuration from scenario.conf , you may see the example configuration file [here](https://github.com/arashrasoulzadeh/GoStreestTest/blob/master/scenario.yaml)
 
 schema for configation file is :
-scenarios:
+
 ```yaml
-  --
-    label: "light"
-    config: "config.yaml"
-    sleep: 1
-  --
-    label: "medium"
-    config: "config4.yaml"
-    sleep : 1
+scenarios:
+      --
+        label: "light"
+        config: "config.yaml"
+        sleep: 1
+      --
+        label: "medium"
+        config: "config4.yaml"
+        sleep : 1
 ```
+
+scenarios key is an array of 
+* label - its just a label
+* config - is the config file name
+* sleep - sleep in seconds after running this part
 ##### changelog
 - scenario added
 - fixed bugs in multi-threading
