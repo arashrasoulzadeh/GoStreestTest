@@ -37,11 +37,11 @@ const defaultPathToConfigFile = "config.yaml"
 func (c *conf) getConf(dest string) *conf {
 	yamlFile, err := ioutil.ReadFile(dest)
 	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
+		panic("failed getting config file ")
 	}
 	err = yaml.Unmarshal(yamlFile, c)
 	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
+		panic("failed to parse config file ")
 	}
 
 	return c
@@ -186,7 +186,7 @@ func single(values *list.List) {
 		f.Close()
 	}()
 	var c conf
-	c.getConf(defaultPathToConfigFile)
+	c.getConf(getConfig())
 	bar := *progressbar.New(c.Hits * 1)
 	bar.RenderBlank()
 	var wg sync.WaitGroup
@@ -198,7 +198,7 @@ func single(values *list.List) {
 func multiple(values *list.List) {
 
 	input := os.Args
-	if len(input) == 3 {
+	if len(input) >= 3 {
 		f, err := os.OpenFile("log.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
 			panic(err)
@@ -213,7 +213,7 @@ func multiple(values *list.List) {
 			return
 		}
 		var c conf
-		c.getConf(defaultPathToConfigFile)
+		c.getConf(getConfig())
 		bar := *progressbar.New(c.Hits * count)
 		bar.RenderBlank()
 		var wg sync.WaitGroup
@@ -229,9 +229,28 @@ func multiple(values *list.List) {
 	}
 }
 
+func getConfig() string {
+	input := os.Args
+	if len(input) >= 2 {
+		command := input[1]
+		if command == "single" {
+			if len(input) == 3 {
+				return input[2];
+			}
+		}
+		if command == "multiple" {
+			if len(input) == 4 {
+				return input[3];
+			}
+		}
+	}
+	return defaultPathToConfigFile;
+}
+
 func commandRouter(s string, values *list.List) {
 	if s == "single" {
 		single(values)
+
 	} else if s == "multiple" {
 		multiple(values)
 	} else {
