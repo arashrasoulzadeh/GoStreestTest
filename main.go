@@ -100,7 +100,6 @@ func getError(err string) string {
 //make request handler
 func MakeRequest(thread int, url string, method string, body string, id int, wg *sync.WaitGroup, bar *progressbar.ProgressBar, f *os.File, ferr error, values *list.List) {
 	defer MakeRequestRecovery(wg, bar)
-	fmt.Println(fmt.Sprintf("runner #%d is running ",thread))
 	start := time.Now()
 	resp, err := SendHttpRequest(method, url, body)
 	duration := time.Since(start).Seconds()
