@@ -12,8 +12,22 @@ Writeen by [Arash Rasoulzadeh]("http://twitter.com/x3n0b1a") , special thanks to
 *runs using 4 threads*
 `go run main.go multiple 4`
 #### Scenario 
+`go run composer.go`
 
+This command runs the composer , composer reads the configuration from scenario.conf , you may see the example configuration file [here](https://github.com/arashrasoulzadeh/GoStreestTest/blob/master/scenario.yaml)
 
+schema for configation file is :
+scenarios:
+```yaml
+  --
+    label: "light"
+    config: "config.yaml"
+    sleep: 1
+  --
+    label: "medium"
+    config: "config4.yaml"
+    sleep : 1
+```
 ##### changelog
 - scenario added
 - fixed bugs in multi-threading
