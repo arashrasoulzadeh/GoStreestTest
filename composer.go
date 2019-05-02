@@ -85,7 +85,7 @@ func main() {
 	c.getScenario(defaultPathToScenarioFile)
 	for _, element := range c.Scenarios {
 		wg.Add(1);
-		coloredPrint("COMPOSER:RUN    ", element.ConfigFile, TYPE_INFO)
+		coloredPrint("COMPOSER:RUN    ", element.Label, TYPE_INFO)
 		run(element.ConfigFile, &wg)
 		coloredPrint("COMPOSER:SLEEP  ", element.Sleep, TYPE_INFO)
 
