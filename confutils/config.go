@@ -41,7 +41,10 @@ func (c *Conf) GetConf(dest string) *Conf {
 		return c
 	}
 
-	json.Unmarshal(file, c)
+	err = json.Unmarshal(file, c)
+	if err != nil {
+		panic("Failed to unmarshal json")
+	}
 	return c
 }
 
