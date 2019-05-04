@@ -193,6 +193,7 @@ func single(values *list.List) {
 	wg.Add(1)
 	worker(&wg, 1, 1, &bar, values, f, err)
 	writeToLog(values, f)
+	fmt.Print("\n")
 }
 
 func multiple(values *list.List) {
@@ -223,6 +224,7 @@ func multiple(values *list.List) {
 		}
 		wg.Wait()
 		writeToLog(values, f)
+		fmt.Print("\n")
 	} else {
 
 		help()
@@ -235,16 +237,16 @@ func getConfig() string {
 		command := input[1]
 		if command == "single" {
 			if len(input) == 3 {
-				return input[2];
+				return input[2]
 			}
 		}
 		if command == "multiple" {
 			if len(input) == 4 {
-				return input[3];
+				return input[3]
 			}
 		}
 	}
-	return defaultPathToConfigFile;
+	return defaultPathToConfigFile
 }
 
 func commandRouter(s string, values *list.List) {
