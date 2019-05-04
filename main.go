@@ -192,6 +192,7 @@ func single(values *list.List) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	worker(&wg, 1, 1, &bar, values, f, err)
+	wg.Wait()
 	writeToLog(values, f)
 	fmt.Print("\n")
 }
