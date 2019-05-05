@@ -14,40 +14,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arashrasoulzadeh/GoStreestTest/confutils"
 	"github.com/schollz/progressbar"
-	"gopkg.in/yaml.v2"
 )
-
-//strucure of the yaml file
-type conf struct {
-	Hits    int                    `yaml:"hits"`
-	Route   string                 `yaml:"route"`
-	Code    int                    `yaml:"code"`
-	Method  string                 `yaml:"method"`
-	Body    map[string]interface{} `yaml:"body"`
-	Headers map[string]string      `yaml:"headers"`
-}
 
 type headersType map[string]string
 
 const defaultPathToConfigFile = "config.yaml"
 
-//get the configuration
-// dest: file destination / the path to config file
-func (c *conf) getConf(dest string) *conf {
-	yamlFile, err := ioutil.ReadFile(dest)
-	if err != nil {
-		panic("failed getting config file ")
-	}
-	err = yaml.Unmarshal(yamlFile, c)
-	if err != nil {
-		panic("failed to parse config file ")
-	}
-
-	return c
-}
-
-//send http call
+// send http call
 func SendHttpRequest(method string, url string, body string, headers headersType) (*http.Response, error) {
 	method = strings.ToUpper(method)
 	switch method {
@@ -155,8 +130,8 @@ func worker(mainWaitGroup *sync.WaitGroup, thread int, total int, bar *progressb
 		defer mainWaitGroup.Done()
 	}()
 	var wg sync.WaitGroup
-	var c conf
-	c.getConf(defaultPathToConfigFile)
+	var c confutils.Conf
+	c.GetConf(defaultPathToConfigFile)
 	_ = time.Now()
 	wg.Add(c.Hits)
 	var body string
@@ -185,8 +160,8 @@ func single(values *list.List) {
 	defer func() {
 		f.Close()
 	}()
-	var c conf
-	c.getConf(getConfig())
+	var c confutils.Conf
+	c.GetConf(getConfig())
 	bar := *progressbar.New(c.Hits * 1)
 	bar.RenderBlank()
 	var wg sync.WaitGroup
@@ -212,8 +187,8 @@ func multiple(values *list.List) {
 			help()
 			return
 		}
-		var c conf
-		c.getConf(getConfig())
+		var c confutils.Conf
+		c.GetConf(getConfig())
 		bar := *progressbar.New(c.Hits * count)
 		bar.RenderBlank()
 		var wg sync.WaitGroup
@@ -235,16 +210,16 @@ func getConfig() string {
 		command := input[1]
 		if command == "single" {
 			if len(input) == 3 {
-				return input[2];
+				return input[2]
 			}
 		}
 		if command == "multiple" {
 			if len(input) == 4 {
-				return input[3];
+				return input[3]
 			}
 		}
 	}
-	return defaultPathToConfigFile;
+	return defaultPathToConfigFile
 }
 
 func commandRouter(s string, values *list.List) {

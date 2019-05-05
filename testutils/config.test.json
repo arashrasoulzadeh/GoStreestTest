@@ -1,0 +1,12 @@
+{
+    "route": "http://aparat.com",
+    "hits": 50,
+    "code": 200,
+    "method": "GET",
+    "body": {
+        "limit": 10
+    },
+    "headers": {
+        "Authorization": "JWT *token*"
+    }
+}
