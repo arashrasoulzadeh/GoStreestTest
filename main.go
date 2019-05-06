@@ -168,6 +168,8 @@ func single(values *list.List) {
 	wg.Add(1)
 	worker(&wg, 1, 1, &bar, values, f, err)
 	writeToLog(values, f)
+	bar.Finish()
+	fmt.Print("\n")
 }
 
 func multiple(values *list.List) {
@@ -198,6 +200,8 @@ func multiple(values *list.List) {
 		}
 		wg.Wait()
 		writeToLog(values, f)
+		bar.Finish()
+		fmt.Print("\n")
 	} else {
 
 		help()
